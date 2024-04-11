@@ -7,11 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-
+from tensorflow import constant
 from tensorflow.keras import layers
 from tensorflow.keras import models
 from IPython import display
-from recordingHelper import recordAudio, terminate
+
+import speech_recognition as sr
+import gtts as gTTS
 
 #Jeu de données
 
@@ -97,16 +99,34 @@ def preprocess_dataset(files):
 
 def preprocessAudio(audios):
     audio_ds = tf.data.Dataset.from_tensor_slices(audios)
-    spectrogram = audio_ds.map(
+    output_ds = audio_ds.map(
+        map_func=decode_audio,
+        num_parallel_calls=AUTOTUNE)
+    spectrogram = output_ds.map(
         map_func=get_spectrogram,
         num_parallel_calls=AUTOTUNE)
     return spectrogram
 
 
+from pydub import AudioSegment
+from pydub.playback import play
 
+def get_audio():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        audio = r.listen(source)
+        a = audio.get_wav_data()
+        #print(r)
+        said = ""
+        try:
+            said = r.recognize_google(audio)
+            print(said)
+        except Exception as e:
+            print("Exception: " + str(e))
+    return a
 
 def predict_mic():
-    audio = recordAudio()
+    audio= get_audio()
     
     spec = preprocessAudio([audio])
     for spectrogram in spec.batch(1):
@@ -116,12 +136,13 @@ def predict_mic():
         command = commands[label_pred[0]]
     return command
 
-loaded_model = models.load_model('../Model/test')
+loaded_model = models.load_model('../Model/model2.h5')
 loaded_model.summary()
+
+#command = predict_mic()
  
 while True:
     command = predict_mic()
     print("Predicted label:", command)
     if command == "off":
-        terminate()
         break
